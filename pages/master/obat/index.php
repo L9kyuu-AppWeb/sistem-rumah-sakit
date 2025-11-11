@@ -21,7 +21,30 @@ switch ($action) {
         // List obat
         $search = isset($_GET['search']) ? cleanInput($_GET['search']) : '';
         $kategoriFilter = isset($_GET['kategori']) ? cleanInput($_GET['kategori']) : '';
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = 10; // 10 items per page
+        $offset = ($page - 1) * $limit;
 
+        // Count total records for pagination
+        $countSql = "SELECT COUNT(*) FROM obat WHERE 1=1";
+        $countParams = [];
+
+        if ($search) {
+            $countSql .= " AND (nama_obat LIKE ? OR kode_obat LIKE ? OR kategori LIKE ?)";
+            $countParams = array_merge($countParams, ["%$search%", "%$search%", "%$search%"]);
+        }
+
+        if ($kategoriFilter) {
+            $countSql .= " AND kategori = ?";
+            $countParams[] = $kategoriFilter;
+        }
+
+        $countStmt = $pdo->prepare($countSql);
+        $countStmt->execute($countParams);
+        $totalRecords = $countStmt->fetchColumn();
+        $totalPages = ceil($totalRecords / $limit);
+
+        // Get obat data
         $sql = "SELECT * FROM obat WHERE 1=1";
 
         if ($search) {
@@ -32,7 +55,7 @@ switch ($action) {
             $sql .= " AND kategori = :kategori";
         }
 
-        $sql .= " ORDER BY nama_obat ASC";
+        $sql .= " ORDER BY nama_obat ASC LIMIT :limit OFFSET :offset";
 
         $stmt = $pdo->prepare($sql);
 
@@ -44,6 +67,10 @@ switch ($action) {
         if ($kategoriFilter) {
             $stmt->bindValue(':kategori', $kategoriFilter);
         }
+        
+        // Bind limit and offset
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 
         $stmt->execute();
         $obat_list = $stmt->fetchAll();
@@ -170,6 +197,67 @@ switch ($action) {
         </table>
     </div>
 </div>
+
+<!-- Pagination -->
+<?php if ($totalRecords > $limit): ?>
+<div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="text-sm text-gray-700">
+        Menampilkan <span class="font-medium"><?php echo $offset + 1; ?></span> sampai <span class="font-medium"><?php echo min($offset + $limit, $totalRecords); ?></span> dari <span class="font-medium"><?php echo $totalRecords; ?></span> data
+    </div>
+    
+    <div class="flex space-x-2">
+        <?php if ($page > 1): ?>
+            <a href="index.php?page=master-obat&action=list&search=<?php echo urlencode($search); ?>&kategori=<?php echo urlencode($kategoriFilter); ?>&page=<?php echo $page - 1; ?>"
+               class="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                Sebelumnya
+            </a>
+        <?php endif; ?>
+
+        <?php
+        // Pagination links
+        $startPage = max(1, $page - 2);
+        $endPage = min($totalPages, $page + 2);
+        ?>
+
+        <?php if ($startPage > 1): ?>
+            <a href="index.php?page=master-obat&action=list&search=<?php echo urlencode($search); ?>&kategori=<?php echo urlencode($kategoriFilter); ?>&page=1"
+               class="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors
+               <?php echo ($page == 1) ? 'bg-blue-50 border-blue-500 text-blue-600' : ''; ?>">
+                1
+            </a>
+            <?php if ($startPage > 2): ?>
+                <span class="px-3 py-2 text-sm font-medium text-gray-700">...</span>
+            <?php endif; ?>
+        <?php endif; ?>
+
+        <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+            <a href="index.php?page=master-obat&action=list&search=<?php echo urlencode($search); ?>&kategori=<?php echo urlencode($kategoriFilter); ?>&page=<?php echo $i; ?>"
+               class="px-3 py-2 rounded-lg border text-sm font-medium transition-colors
+               <?php echo ($i == $page) ? 'bg-blue-50 border-blue-500 text-blue-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'; ?>">
+                <?php echo $i; ?>
+            </a>
+        <?php endfor; ?>
+
+        <?php if ($endPage < $totalPages): ?>
+            <?php if ($endPage < $totalPages - 1): ?>
+                <span class="px-3 py-2 text-sm font-medium text-gray-700">...</span>
+            <?php endif; ?>
+            <a href="index.php?page=master-obat&action=list&search=<?php echo urlencode($search); ?>&kategori=<?php echo urlencode($kategoriFilter); ?>&page=<?php echo $totalPages; ?>"
+               class="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors
+               <?php echo ($page == $totalPages) ? 'bg-blue-50 border-blue-500 text-blue-600' : ''; ?>">
+                <?php echo $totalPages; ?>
+            </a>
+        <?php endif; ?>
+
+        <?php if ($page < $totalPages): ?>
+            <a href="index.php?page=master-obat&action=list&search=<?php echo urlencode($search); ?>&kategori=<?php echo urlencode($kategoriFilter); ?>&page=<?php echo $page + 1; ?>"
+               class="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                Berikutnya
+            </a>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php
         break;
