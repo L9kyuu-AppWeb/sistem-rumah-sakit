@@ -114,5 +114,7 @@ $alert = getAlert();
         function confirmDelete(message) {
             return confirm(message || 'Apakah Anda yakin ingin menghapus data ini?');
         }
+        
+
     </script>
     <?php endif; ?>
